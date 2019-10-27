@@ -75,7 +75,7 @@ public class BatchConfiguration {
 		return stepBuilderFactory.get("step1")
 				.<Persona,Persona>chunk(10)
 				.reader(reader())
-//				.processor(processor())
+				.processor(processor())
 				.writer(writer)
 				.build();
 	}

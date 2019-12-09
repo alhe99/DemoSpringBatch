@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component;
 
 import com.spring.batch.demo.app.model.Persona;
 
+import java.util.concurrent.TimeUnit;
+
 @Component
 public class JobListener extends JobExecutionListenerSupport {
 	
@@ -18,16 +20,21 @@ public class JobListener extends JobExecutionListenerSupport {
 	
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
-	
-	
+
+	@Override
+	public void beforeJob(JobExecution jobExecution) {
+		LOG.info("INICIA EL JOB EN :  " + jobExecution.getStartTime());
+	}
+
 	@Override
 	public void afterJob(JobExecution jobExecution) {
 		if(jobExecution.getStatus() == BatchStatus.COMPLETED) {
-			LOG.info("FINALIZO EL JOB!!! Verifica los resultados: ");
+			long diff = jobExecution.getEndTime().getTime() - jobExecution.getStartTime().getTime();
+			LOG.info("FINALIZO EL JOB EN :  " + TimeUnit.SECONDS.convert(diff, TimeUnit.MILLISECONDS));
 			
-			jdbcTemplate.query("SELECT primer_nombre,segundo_nombre,telefono FROM personas",
+			/*jdbcTemplate.query("SELECT primer_nombre,segundo_nombre,telefono FROM personas",
 					(rs,row) -> new Persona(rs.getString(1), rs.getString(2), rs.getString(3)))
-			.forEach(persona -> LOG.info("REGISTRO < "+persona+" > "));
+			.forEach(persona -> LOG.info("REGISTRO < "+persona+" > "));*/
 		}
 	}
 

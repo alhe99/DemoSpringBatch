@@ -5,7 +5,6 @@ import java.util.Date;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,9 +27,10 @@ public class JobTask {
 
 		LOGGER.info("INICIO: " + new Date());
 
-		JobParameters jobParameters = new JobParametersBuilder()
-				.addString("JobID", String.valueOf(System.currentTimeMillis())).toJobParameters();
+		JobParametersBuilder builder = new JobParametersBuilder();
+		builder.addString("JobID", String.valueOf(System.currentTimeMillis()));
+		jobLauncher.run(job, builder.toJobParameters());
 
-		jobLauncher.run(job, jobParameters);
 	}
+
 }

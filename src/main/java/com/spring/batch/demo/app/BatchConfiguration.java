@@ -2,12 +2,16 @@ package com.spring.batch.demo.app;
 
 import javax.sql.DataSource;
 
+import com.spring.batch.demo.app.reader.PersonReader;
+import com.spring.batch.demo.app.services.PersonaService;
+import com.spring.batch.demo.app.writter.PersonaWritter;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
@@ -23,6 +27,7 @@ import com.spring.batch.demo.app.listener.JobListener;
 import com.spring.batch.demo.app.model.Persona;
 import com.spring.batch.demo.app.processor.PersonaItemProcessor;
 
+
 @Configuration
 @EnableBatchProcessing
 public class BatchConfiguration {
@@ -33,7 +38,10 @@ public class BatchConfiguration {
 	@Autowired
 	public StepBuilderFactory stepBuilderFactory;
 
-	@Bean
+	@Autowired
+	private PersonaService personaService;
+
+	/*@Bean
 	public FlatFileItemReader<Persona> reader(){
 		return new FlatFileItemReaderBuilder<Persona>()
 				.name("personaItemReader")
@@ -44,21 +52,31 @@ public class BatchConfiguration {
 					setTargetType(Persona.class); 
 				}})
 				.build();
-	}	
+	}*/
+
+	@Bean
+	public ItemReader<Persona> personaItemReader(){
+		return new PersonReader(personaService.findAllPersonas());
+	}
 	
 	@Bean
 	public PersonaItemProcessor processor () {
 		return new PersonaItemProcessor();
 	}
-	
+
 	@Bean
+	public PersonaWritter personaWritter(){
+		return new PersonaWritter();
+	}
+	
+	/*@Bean
 	public JdbcBatchItemWriter<Persona> writer(DataSource dataSource){
 		return new JdbcBatchItemWriterBuilder<Persona>()
 				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<Persona>())
 				.sql("INSERT INTO personas (primer_nombre,segundo_nombre,telefono) VALUES (:primerNombre,:segundoNombre,:telefono)")
 				.dataSource(dataSource)
 				.build();
-	}
+	}*/
 	
 	@Bean
 	public Job importPersonaJob(JobListener listener,Step step1) {
@@ -71,12 +89,12 @@ public class BatchConfiguration {
 	}
 	
 	@Bean
-	public Step step1(JdbcBatchItemWriter<Persona> writer) {
+	public Step step1(PersonaWritter writer) {
 		return stepBuilderFactory.get("step1")
 				.<Persona,Persona>chunk(10)
-				.reader(reader())
+				.reader(personaItemReader())
 				.processor(processor())
-				.writer(writer)
+				.writer(personaWritter())
 				.build();
 	}
 }

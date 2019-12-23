@@ -1,5 +1,7 @@
 package com.spring.batch.demo.app;
 
+import javax.sql.DataSource;
+
 import com.spring.batch.demo.app.listener.StepListenerPersona;
 import com.spring.batch.demo.app.reader.PersonReader;
 import com.spring.batch.demo.app.services.PersonaService;
@@ -9,10 +11,12 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.integration.async.AsyncItemProcessor;
 import org.springframework.batch.integration.async.AsyncItemWriter;
 import org.springframework.batch.item.ItemProcessor;
+import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -41,29 +45,11 @@ public class BatchConfiguration {
 	@Autowired
 	private PersonaService personaService;
 
-	@Bean
-	public PersonReader personaItemReader(){
-		return new PersonReader(personaService.findAllPersonas());
-	}
-	
-	@Bean
-	public PersonaItemProcessor processor () {
-		return new PersonaItemProcessor();
-	}
-
-	@Bean
-	public PersonaWritter personaWritter(){
-		return new PersonaWritter();
-	}
-
-	/**
-	 * CONVERTIENDO PROCESSOR AND WRITTER IN ASYNC TASK
-	 */
 	@Bean(name = "asyncExecutor")
 	public TaskExecutor getAsyncExecutor()
 	{
 		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-		executor.setCorePoolSize(100);
+		executor.setCorePoolSize(5);
 		executor.setMaxPoolSize(5);
 		executor.setQueueCapacity(100);
 		executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
@@ -86,6 +72,20 @@ public class BatchConfiguration {
 		return asyncItemWriter;
 	}
 
+	@Bean
+	public ItemReader<Persona> personaItemReader(){
+		return new PersonReader(personaService.findAllPersonas());
+	}
+	
+	@Bean
+	public PersonaItemProcessor processor () {
+		return new PersonaItemProcessor();
+	}
+
+	@Bean
+	public PersonaWritter personaWritter(){
+		return new PersonaWritter();
+	}
 
 	@Bean
 	public Job importPersonaJob(JobListener listener,Step step1) {

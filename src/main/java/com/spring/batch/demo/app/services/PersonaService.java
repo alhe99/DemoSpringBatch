@@ -11,7 +11,7 @@ public class PersonaService {
 
     public List<Persona> findAllPersonas(){
         List<Persona> personas = new ArrayList<Persona>();
-        for(int i =0;i<500000;i++){
+        for(int i =0;i<99877;i++){
             Persona persona = new Persona();
             persona.setPrimerNombre("NOMBRE PERSONA: " + i);
             persona.setSegundoNombre("SEGUNDO NOMBRE PERSONA: " + i);

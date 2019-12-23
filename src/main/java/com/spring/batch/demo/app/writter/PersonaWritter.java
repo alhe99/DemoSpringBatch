@@ -16,5 +16,7 @@ public class PersonaWritter implements ItemWriter<Persona> {
         /*items.forEach(persona ->{
             LOGGER.info("SAVE PERSONA: " + persona.getPrimerNombre());
         });*/
+
+        LOGGER.info("CANTIDAD DE PERSONAS EN WRITTER: " + items.size());
     }
 }

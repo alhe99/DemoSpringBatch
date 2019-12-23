@@ -13,8 +13,8 @@ public class PersonaWritter implements ItemWriter<Persona> {
 
     @Override
     public void write(List<? extends Persona> items) throws Exception {
-        items.forEach(persona ->{
+        /*items.forEach(persona ->{
             LOGGER.info("SAVE PERSONA: " + persona.getPrimerNombre());
-        });
+        });*/
     }
 }

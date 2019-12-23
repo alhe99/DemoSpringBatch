@@ -31,7 +31,8 @@ public class JobListener extends JobExecutionListenerSupport {
 		if(jobExecution.getStatus() == BatchStatus.COMPLETED) {
 			long diff = jobExecution.getEndTime().getTime() - jobExecution.getStartTime().getTime();
 			LOG.info("FINALIZO EL JOB EN :  " + TimeUnit.SECONDS.convert(diff, TimeUnit.MILLISECONDS));
-			
+
+
 			/*jdbcTemplate.query("SELECT primer_nombre,segundo_nombre,telefono FROM personas",
 					(rs,row) -> new Persona(rs.getString(1), rs.getString(2), rs.getString(3)))
 			.forEach(persona -> LOG.info("REGISTRO < "+persona+" > "));*/

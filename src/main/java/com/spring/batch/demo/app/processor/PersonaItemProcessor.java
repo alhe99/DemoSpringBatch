@@ -17,7 +17,7 @@ public class PersonaItemProcessor implements ItemProcessor<Persona,Persona> {
 		
 		Persona persona = new Persona(primerNombre,segundoNombre,item.getTelefono());
 		
-		LOG.info("Convirtiendo ("+item+") a ("+persona+")");
+		//LOG.info("Convirtiendo ("+item+") a ("+persona+")");
 		return persona;
 	}
 

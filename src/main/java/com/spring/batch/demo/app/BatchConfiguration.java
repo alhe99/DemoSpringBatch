@@ -1,7 +1,6 @@
 package com.spring.batch.demo.app;
 
-import javax.sql.DataSource;
-
+import com.spring.batch.demo.app.listener.StepListenerPersona;
 import com.spring.batch.demo.app.reader.PersonReader;
 import com.spring.batch.demo.app.services.PersonaService;
 import com.spring.batch.demo.app.writter.PersonaWritter;
@@ -11,21 +10,22 @@ import org.springframework.batch.core.configuration.annotation.EnableBatchProces
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
-import org.springframework.batch.item.ItemReader;
-import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
-import org.springframework.batch.item.database.JdbcBatchItemWriter;
-import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
-import org.springframework.batch.item.file.FlatFileItemReader;
-import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
-import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
+import org.springframework.batch.integration.async.AsyncItemProcessor;
+import org.springframework.batch.integration.async.AsyncItemWriter;
+import org.springframework.batch.item.ItemProcessor;
+import org.springframework.batch.item.ItemWriter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 
 import com.spring.batch.demo.app.listener.JobListener;
 import com.spring.batch.demo.app.model.Persona;
 import com.spring.batch.demo.app.processor.PersonaItemProcessor;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 
 
 @Configuration
@@ -41,21 +41,8 @@ public class BatchConfiguration {
 	@Autowired
 	private PersonaService personaService;
 
-	/*@Bean
-	public FlatFileItemReader<Persona> reader(){
-		return new FlatFileItemReaderBuilder<Persona>()
-				.name("personaItemReader")
-				.resource(new ClassPathResource("sample-data.csv"))
-				.delimited()
-				.names(new String[] {"primerNombre","segundoNombre","telefono"})
-				.fieldSetMapper(new BeanWrapperFieldSetMapper<Persona>() {{
-					setTargetType(Persona.class); 
-				}})
-				.build();
-	}*/
-
 	@Bean
-	public ItemReader<Persona> personaItemReader(){
+	public PersonReader personaItemReader(){
 		return new PersonReader(personaService.findAllPersonas());
 	}
 	
@@ -68,16 +55,38 @@ public class BatchConfiguration {
 	public PersonaWritter personaWritter(){
 		return new PersonaWritter();
 	}
-	
-	/*@Bean
-	public JdbcBatchItemWriter<Persona> writer(DataSource dataSource){
-		return new JdbcBatchItemWriterBuilder<Persona>()
-				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<Persona>())
-				.sql("INSERT INTO personas (primer_nombre,segundo_nombre,telefono) VALUES (:primerNombre,:segundoNombre,:telefono)")
-				.dataSource(dataSource)
-				.build();
-	}*/
-	
+
+	/**
+	 * CONVERTIENDO PROCESSOR AND WRITTER IN ASYNC TASK
+	 */
+	@Bean(name = "asyncExecutor")
+	public TaskExecutor getAsyncExecutor()
+	{
+		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+		executor.setCorePoolSize(100);
+		executor.setMaxPoolSize(5);
+		executor.setQueueCapacity(100);
+		executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+		executor.setThreadNamePrefix("AsyncExecutor-");
+		return executor;
+	}
+
+	@Bean
+	public ItemProcessor<Persona, Future<Persona>> asyncItemProcessor(){
+		AsyncItemProcessor<Persona, Persona> asyncItemProcessor = new AsyncItemProcessor<>();
+		asyncItemProcessor.setDelegate(processor());
+		asyncItemProcessor.setTaskExecutor(getAsyncExecutor());
+		return asyncItemProcessor;
+	}
+
+	@Bean
+	public ItemWriter<Future<Persona>> asyncItemWriter(){
+		AsyncItemWriter<Persona> asyncItemWriter = new AsyncItemWriter<>();
+		asyncItemWriter.setDelegate(personaWritter());
+		return asyncItemWriter;
+	}
+
+
 	@Bean
 	public Job importPersonaJob(JobListener listener,Step step1) {
 		return jobBuilderFactory.get("importPersonaJob")
@@ -91,10 +100,11 @@ public class BatchConfiguration {
 	@Bean
 	public Step step1(PersonaWritter writer) {
 		return stepBuilderFactory.get("step1")
-				.<Persona,Persona>chunk(10)
+				.<Persona, Future<Persona>>chunk(100)
 				.reader(personaItemReader())
-				.processor(processor())
-				.writer(personaWritter())
+				.processor(asyncItemProcessor())
+				.writer(asyncItemWriter())
+				.listener(new StepListenerPersona())
 				.build();
 	}
 }

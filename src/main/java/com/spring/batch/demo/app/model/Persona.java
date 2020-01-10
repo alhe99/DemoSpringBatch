@@ -1,11 +1,20 @@
 package com.spring.batch.demo.app.model;
 
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+
+@Entity
 public class Persona {
 
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Integer id;
 	private String primerNombre;
 	private String segundoNombre;
 	private String telefono;
-
+	private Integer correlativo;
 	public Persona() {
 	}
 
@@ -13,6 +22,22 @@ public class Persona {
 		this.primerNombre = primerNombre;
 		this.segundoNombre = segundoNombre;
 		this.telefono = telefono;
+	}
+
+	public void setCorrelativo(Integer correlativo) {
+		this.correlativo = correlativo;
+	}
+
+	public Integer getCorrelativo() {
+		return correlativo;
+	}
+
+	public Integer getId() {
+		return id;
+	}
+
+	public void setId(Integer id) {
+		this.id = id;
 	}
 
 	public String getPrimerNombre() {

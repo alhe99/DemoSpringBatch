@@ -23,6 +23,8 @@ import org.springframework.batch.integration.async.AsyncItemWriter;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.ParseException;
+import org.springframework.batch.item.UnexpectedInputException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,6 +35,8 @@ import com.spring.batch.demo.app.processor.PersonaItemProcessor;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.net.MalformedURLException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 
@@ -51,24 +55,23 @@ public class BatchConfiguration {
 	private PersonaService personaService;
 
 
-
-	@Bean(name = "asyncExecutor")
+	/*@Bean(name = "asyncExecutor")
 	public TaskExecutor getAsyncExecutor()
 	{
 		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-		executor.setCorePoolSize(4);
-		executor.setMaxPoolSize(4);
+		executor.setCorePoolSize(5);
+		executor.setMaxPoolSize(5);
 		executor.setQueueCapacity(100);
 		executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
 		executor.setThreadNamePrefix("AsyncExecutor-");
 		return executor;
-	}
+	}*/
 
 	@Bean
 	public ItemProcessor<Persona, Future<Persona>> asyncItemProcessor(){
 		AsyncItemProcessor<Persona, Persona> asyncItemProcessor = new AsyncItemProcessor<>();
 		asyncItemProcessor.setDelegate(processor());
-		asyncItemProcessor.setTaskExecutor(getAsyncExecutor());
+		asyncItemProcessor.setTaskExecutor(taskExecutor());
 		return asyncItemProcessor;
 	}
 
@@ -79,41 +82,90 @@ public class BatchConfiguration {
 		return asyncItemWriter;
 	}
 
+
 	@Bean
-	@StepScope
 	public PersonReader personaItemReader(){
 		return new PersonReader(personaService.findAllPersonas());
 	}
-	
+
 	@Bean
 	public PersonaItemProcessor processor () {
 		return new PersonaItemProcessor();
 	}
-
 	@Bean
 	public PersonaWritter personaWritter(){
 		return new PersonaWritter();
 	}
 
 	@Bean
-	public Job importPersonaJob(JobListener listener,Step step1) {
-		return jobBuilderFactory.get("importPersonaJob")
-				.incrementer(new RunIdIncrementer())
-				.listener(listener)
-				.flow(step1)
-				.end()
+	public Step slaveStep()
+			throws UnexpectedInputException, MalformedURLException, ParseException {
+		return stepBuilderFactory.get("slaveStep").<Persona, Persona>chunk(1)
+				.reader(personaItemReader())
+				.processor(processor())
+				.writer(personaWritter())
 				.build();
 	}
 
+	@Bean
+	public Step partitionStep()
+			throws UnexpectedInputException, MalformedURLException, ParseException {
+		return stepBuilderFactory.get("partitionStep")
+				.partitioner("slaveStep", rangePartitioner())
+				.step(slaveStep())
+				.taskExecutor(taskExecutor())
+				.build();
+	}
 
 	@Bean
-	public Step step1() {
-		return stepBuilderFactory.get("step1")
-				.<Persona, Future<Persona>>chunk(10)
+	public Job PartitionJob() {
+		return jobBuilderFactory.get("partitionJob").incrementer(new RunIdIncrementer()).listener(new JobListener())
+				.start(masterStep()).next(step2()).build();
+	}
+
+	@Bean
+	public Step step2() {
+		return stepBuilderFactory.get("step2").tasklet(dummyTask()).build();
+	}
+
+	@Bean
+	public DummyTasklet dummyTask() {
+		return new DummyTasklet();
+	}
+
+	@Bean
+	public Step masterStep() {
+		return stepBuilderFactory.get("masterStep").partitioner(slave().getName(), rangePartitioner()).listener(new StepListenerPersona())
+				.partitionHandler(masterSlaveHandler()).build();
+	}
+
+	@Bean
+	public PartitionHandler masterSlaveHandler() {
+		TaskExecutorPartitionHandler handler = new TaskExecutorPartitionHandler();
+		handler.setGridSize(10);
+		handler.setTaskExecutor(taskExecutor());
+		handler.setStep(slave());
+		try {
+			handler.afterPropertiesSet();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return handler;
+	}
+	@Bean(name = "slave")
+	public Step slave() {
+		return stepBuilderFactory.get("slave").<Persona, Future<Persona>>chunk(1)
 				.reader(personaItemReader())
-				.processor(asyncItemProcessor())
-				.writer(asyncItemWriter())
-				.listener(new StepListenerPersona())
-				.build();
+				.processor(asyncItemProcessor()).writer(asyncItemWriter()).build();
+	}
+
+	@Bean
+	public RangePartitioner rangePartitioner() {
+		return new RangePartitioner();
+	}
+
+	@Bean
+	public SimpleAsyncTaskExecutor taskExecutor() {
+		return new SimpleAsyncTaskExecutor();
 	}
 }

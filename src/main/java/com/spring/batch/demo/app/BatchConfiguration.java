@@ -33,7 +33,6 @@ import com.spring.batch.demo.app.processor.PersonaItemProcessor;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 
@@ -51,26 +50,14 @@ public class BatchConfiguration {
 	@Autowired
 	private PersonaService personaService;
 
-	@Bean
-	public ItemProcessor<Persona, Future<Persona>> asyncItemProcessor(){
-		AsyncItemProcessor<Persona, Persona> asyncItemProcessor = new AsyncItemProcessor<>();
-		asyncItemProcessor.setDelegate(processor());
-		asyncItemProcessor.setTaskExecutor(taskExecutor());
-		return asyncItemProcessor;
-	}
 
-	@Bean
-	public ItemWriter<Future<Persona>> asyncItemWriter(){
-		AsyncItemWriter<Persona> asyncItemWriter = new AsyncItemWriter<>();
-		asyncItemWriter.setDelegate(personaWritter());
-		return asyncItemWriter;
-	}
-	/*@Bean(name = "asyncExecutor")
+
+	@Bean(name = "asyncExecutor")
 	public TaskExecutor getAsyncExecutor()
 	{
 		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-		executor.setCorePoolSize(5);
-		executor.setMaxPoolSize(5);
+		executor.setCorePoolSize(4);
+		executor.setMaxPoolSize(4);
 		executor.setQueueCapacity(100);
 		executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
 		executor.setThreadNamePrefix("AsyncExecutor-");
@@ -93,7 +80,8 @@ public class BatchConfiguration {
 	}
 
 	@Bean
-	public ItemReader<Persona> personaItemReader(){
+	@StepScope
+	public PersonReader personaItemReader(){
 		return new PersonReader(personaService.findAllPersonas());
 	}
 	
@@ -117,14 +105,6 @@ public class BatchConfiguration {
 				.build();
 	}
 
-	@Bean
-	public PartitionHandler partitionHandler() {
-		TaskExecutorPartitionHandler retVal = new TaskExecutorPartitionHandler();
-		retVal.setTaskExecutor(getAsyncExecutor());
-		retVal.setStep(step1());
-		retVal.setGridSize(10);
-		return retVal;
-	}
 
 	@Bean
 	public Step step1() {
@@ -135,80 +115,5 @@ public class BatchConfiguration {
 				.writer(asyncItemWriter())
 				.listener(new StepListenerPersona())
 				.build();
-	}*/
-
-	@Bean
-	@StepScope
-	public PersonReader personaItemReader(){
-		return new PersonReader(personaService.findAllPersonas());
 	}
-
-	@Bean
-	@StepScope
-	public PersonaItemProcessor processor () {
-		return new PersonaItemProcessor();
-	}
-	@Bean
-	@StepScope
-	public PersonaWritter personaWritter(){
-		return new PersonaWritter();
-	}
-
-	@Bean
-	public Job PartitionJob() {
-		return jobBuilderFactory.get("partitionJob").incrementer(new RunIdIncrementer())
-				.start(masterStep()).next(step2()).build();
-	}
-
-	@Bean
-	public Step step2() {
-		return stepBuilderFactory.get("step2").tasklet(dummyTask()).build();
-	}
-
-	@Bean
-	public DummyTasklet dummyTask() {
-		return new DummyTasklet();
-	}
-
-	@Bean
-	public Step masterStep() {
-		return stepBuilderFactory.get("masterStep").partitioner(slave().getName(), rangePartitioner())
-				.partitionHandler(masterSlaveHandler()).build();
-	}
-
-	@Bean
-	public PartitionHandler masterSlaveHandler() {
-		TaskExecutorPartitionHandler handler = new TaskExecutorPartitionHandler();
-		handler.setGridSize(10);
-		handler.setTaskExecutor(taskExecutor());
-		handler.setStep(slave());
-		try {
-			handler.afterPropertiesSet();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return handler;
-	}
-	@Bean(name = "slave")
-	public Step slave() {
-		return stepBuilderFactory.get("slave").<Persona, Persona>chunk(10)
-				.reader(personaItemReader())
-				.processor(processor()).writer(personaWritter()).build();
-	}
-
-	@Bean
-	public RangePartitioner rangePartitioner() {
-		return new RangePartitioner();
-	}
-
-	@Bean
-	public SimpleAsyncTaskExecutor taskExecutor() {
-		return new SimpleAsyncTaskExecutor();
-	}
-
-
-
-
-
-
 }

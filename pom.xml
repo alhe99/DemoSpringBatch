@@ -7,6 +7,7 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>2.2.0.RELEASE</version>
+        <relativePath> ../DemoSpringBatch/pom.xml</relativePath>
     </parent>
     <groupId>com.spring.batch.demo.app</groupId>
     <artifactId>DemoSpringBatch</artifactId>
